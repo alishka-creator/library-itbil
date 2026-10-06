@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мектеп кітапханасы — каталог және брондау</title>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@500;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{--green:#1f3d36;--chalk:#f3f5f2;--brass:#b8862a;--ink:#14211e}
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--chalk);color:var(--ink)}
+  .serif{font-family:'Literata',Georgia,serif}
+  .spine{background:var(--c);box-shadow:inset -6px 0 0 rgba(0,0,0,.18),inset 3px 0 0 rgba(255,255,255,.18)}
+  :focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .modal-in{animation:pop .18s ease-out}
+  @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  @media (prefers-reduced-motion:reduce){.modal-in{animation:none}}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header style="background:var(--green)" class="text-white">
+  <div class="max-w-6xl mx-auto px-4 py-5 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="serif text-2xl sm:text-3xl font-bold">Мектеп кітапханасы</h1>
+      <p class="text-sm text-emerald-100/80">Кітапты тауып, нақты данасын брондаңыз</p>
+    </div>
+    <nav class="flex gap-2" aria-label="Бөлімдер">
+      <button id="tab-catalog" class="tab px-4 py-2 rounded-lg font-medium">Каталог</button>
+      <button id="tab-my" class="tab px-4 py-2 rounded-lg font-medium">Менің брондарым <span id="my-count" class="hidden ml-1 text-xs bg-white/25 rounded-full px-2 py-0.5"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- Каталог -->
+  <section id="view-catalog">
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <label class="flex-1">
+        <span class="sr-only">Атауы немесе авторы бойынша іздеу</span>
+        <input id="search" type="search" placeholder="Атауы немесе авторы бойынша іздеу" class="w-full rounded-lg border border-stone-300 bg-white px-4 py-3">
+      </label>
+      <label class="flex items-center gap-2 text-sm bg-white border border-stone-300 rounded-lg px-4 py-3 cursor-pointer">
+        <input id="only-free" type="checkbox" class="w-4 h-4 accent-emerald-800"> Тек бос даналары бар кітаптар
+      </label>
+    </div>
+    <div id="genres" class="flex flex-wrap gap-2 mb-6"></div>
+    <div id="grid" class="grid gap-5 md:grid-cols-2"></div>
+    <p id="empty" class="hidden text-center text-stone-500 py-16">Ештеңе табылмады. Сұранысты өзгертіңіз немесе басқа жанр таңдаңыз.</p>
+  </section>
+
+  <!-- Мои брони -->
+  <section id="view-my" class="hidden max-w-2xl">
+    <h2 class="serif text-2xl font-bold mb-1">Менің брондарым</h2>
+    <p class="text-stone-600 mb-4">Аты-жөніңізді брондау кезіндегідей енгізіңіз.</p>
+    <div class="flex gap-2 mb-6">
+      <input id="my-name" type="text" placeholder="Мысалы: Сәрсенбаев Нұрлан Ерланұлы" class="flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3" autocomplete="name">
+      <button id="my-find" class="px-5 py-3 rounded-lg text-white font-medium" style="background:var(--green)">Көрсету</button>
+    </div>
+    <div id="my-list" class="space-y-3"></div>
+  </section>
+</main>
+
+<!-- Модальное окно -->
+<div id="overlay" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+  <div id="modal" class="modal-in bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const BOOKS = [
+    { id:'b1', title:'Абай жолы', author:'М. О. Әуезов', genre:'Роман-эпопея', icon:'🐎', color:'#1f3d36',
+      desc:'Ұлы ақынның өмірі мен қазақ халқының XIX ғасырдағы тұрмысын, ой-арманын бейнелейтін роман-эпопея.',
+      copies:['КІТ-1001','КІТ-1002','КІТ-1003'] },
+    { id:'b2', title:'Қан мен тер', author:'Ә. Нұрпейісов', genre:'Тарихи роман', icon:'🌾', color:'#7a2e2e',
+      desc:'Қазақ ауылының ауыр кезеңдегі тағдыры, адамдардың төзімі мен достығы туралы роман.',
+      copies:['КІТ-1101','КІТ-1102'] },
+    { id:'b3', title:'Көшпенділер', author:'І. Есенберлин', genre:'Тарихи роман', icon:'🏹', color:'#8a5a1f',
+      desc:'Қазақ хандығының құрылуы мен жоңғар шапқыншылығы тұсындағы халық тағдыры туралы тарихи трилогия.',
+      copies:['КІТ-1201','КІТ-1202','КІТ-1203'] },
+    { id:'b4', title:'Менің атым Қожа', author:'Б. Соқпақбаев', genre:'Повесть', icon:'🎒', color:'#2f6f7a',
+      desc:'Бала Қожаның қызықты да күлкілі оқиғалары арқылы өмір мен достық туралы жазылған повесть.',
+      copies:['КІТ-1301','КІТ-1302'] },
+    { id:'b5', title:'Абай қара сөздері', author:'Абай Құнанбайұлы', genre:'Философия', icon:'📜', color:'#3b3f5c',
+      desc:'Абайдың адамгершілік, ғылым мен еңбек туралы ойлары жинақталған философиялық шығарма.',
+      copies:['КІТ-1401','КІТ-1402','КІТ-1403'] },
+    { id:'b6', title:'Кішкентай ханзада', author:'А. де Сент-Экзюпери', genre:'Ертегі', icon:'🌹', color:'#6a3d7a',
+      desc:'Балаларға арналған, бірақ ересектерді де ойландыратын достық, махаббат және жауапкершілік туралы ертегі.',
+      copies:['КІТ-1501','КІТ-1502'] },
+    { id:'b7', title:'Мастер мен Маргарита', author:'М. А. Булгаков', genre:'Фантастика', icon:'🐈‍⬛', color:'#5a3b2a',
+      desc:'Мәскеуге келген шайтан мен Мастер және Маргарита махаббаты туралы фантастикалық роман.',
+      copies:['КІТ-1601','КІТ-1602','КІТ-1603'] }
+  ];
+
+  const KEY = 'school-library-reservations-v2';
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm = (s) => s.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+
+  // reservations: { [copyId]: { bookId, name, grade, contact, date, code } }
+  let reservations = load();
+  let genre = 'Барлығы';
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(reservations)); } catch {}
+  }
+  const bookById = (id) => BOOKS.find(b => b.id === id);
+  const freeCount = (b) => b.copies.filter(c => !reservations[c]).length;
+
+  /* ---------- Каталог ---------- */
+  function renderGenres() {
+    const list = ['Барлығы', ...new Set(BOOKS.map(b => b.genre))];
+    $('#genres').innerHTML = list.map(g =>
+      `<button data-genre="${esc(g)}" class="px-4 py-1.5 rounded-full border text-sm font-medium ${g===genre ? 'text-white border-transparent' : 'bg-white border-stone-300 hover:border-stone-500'}" ${g===genre ? 'style="background:var(--green)"' : ''}>${esc(g)}</button>`
+    ).join('');
+  }
+
+  function renderCatalog() {
+    const q = norm($('#search').value);
+    const onlyFree = $('#only-free').checked;
+    const items = BOOKS.filter(b =>
+      (genre === 'Барлығы' || b.genre === genre) &&
+      (!q || norm(b.title).includes(q) || norm(b.author).includes(q)) &&
+      (!onlyFree || freeCount(b) > 0)
+    );
+    $('#empty').classList.toggle('hidden', items.length > 0);
+    $('#grid').innerHTML = items.map(b => {
+      const free = freeCount(b);
+      return `
+      <article class="bg-white rounded-2xl border border-stone-200 overflow-hidden flex">
+        <div class="spine w-28 sm:w-32 shrink-0 flex flex-col items-center justify-center text-white p-3 text-center" style="--c:${b.color}">
+          <div class="text-5xl mb-2" aria-hidden="true">${b.icon}</div>
+          <div class="serif text-xs leading-tight opacity-90">${esc(b.author)}</div>
+        </div>
+        <div class="p-4 flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="serif text-lg font-bold leading-snug">${esc(b.title)}</h3>
+            <span class="text-xs px-2 py-1 rounded-full bg-stone-100 text-stone-700 whitespace-nowrap">${esc(b.genre)}</span>
+          </div>
+          <p class="text-sm text-stone-600 mt-1">${esc(b.author)}</p>
+          <p class="text-sm mt-2">${esc(b.desc)}</p>
+          <p class="text-xs font-bold mt-3 ${free ? 'text-emerald-800' : 'text-rose-700'}">${free ? `Бос: ${free} / ${b.copies.length}` : 'Барлық даналар брондалған'}</p>
+          <ul class="mt-2 divide-y divide-stone-100">
+            ${b.copies.map(c => {
+              const r = reservations[c];
+              return `<li class="flex items-center justify-between gap-2 py-2">
+                <span class="font-mono text-sm">${esc(c)}</span>
+                ${r
+                  ? `<span class="text-xs font-medium px-2.5 py-1 rounded-full bg-rose-100 text-rose-800">Брондалған</span>`
+                  : `<span class="flex items-center gap-2">
+                       <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Қолжетімді</span>
+                       <button data-book="${c}" class="text-sm px-3 py-1.5 rounded-lg text-white font-medium" style="background:var(--green)">Брондау</button>
+                     </span>`}
+              </li>`;
+            }).join('')}
+          </ul>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  /* ---------- Модальные окна ---------- */
+  function openModal(html) {
+    $('#modal').innerHTML = html;
+    $('#overlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    const first = $('#modal input, #modal button');
+    if (first) first.focus();
+  }
+  function closeModal() {
+    $('#overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  function openBookingForm(copyId) {
+    const book = BOOKS.find(b => b.copies.includes(copyId));
+    if (reservations[copyId]) { renderAll(); return; }
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('school-library-last-student')) || {}; } catch { return {}; } })();
+    const field = 'w-full rounded-lg border border-stone-300 px-3 py-2.5 mt-1';
+    openModal(`
+      <h2 class="serif text-xl font-bold">Брондау</h2>
+      <p class="text-sm text-stone-600 mt-1">${esc(book.title)} — дана <span class="font-mono font-bold">${esc(copyId)}</span></p>
+      <form id="book-form" class="mt-4 space-y-3" novalidate>
+        <label class="block text-sm font-medium">Аты-жөні
+          <input name="name" class="${field}" placeholder="Сәрсенбаев Нұрлан Ерланұлы" value="${esc(saved.name||'')}" autocomplete="name" required>
+        </label>
+        <label class="block text-sm font-medium">Сынып
+          <input name="grade" class="${field}" placeholder="Мысалы: 8Б" value="${esc(saved.grade||'')}" maxlength="6" required>
+        </label>
+        <label class="block text-sm font-medium">Телефон немесе пошта
+          <input name="contact" class="${field}" placeholder="+7 700 000 00 00 немесе nurlan@mail.kz" value="${esc(saved.contact||'')}" required>
+        </label>
+        <p id="form-error" class="hidden text-sm text-rose-700"></p>
+        <div class="flex gap-2 pt-2">
+          <button type="submit" class="flex-1 py-2.5 rounded-lg text-white font-medium" style="background:var(--green)">Брондау</button>
+          <button type="button" data-close class="px-4 py-2.5 rounded-lg border border-stone-300">Болдырмау</button>
+        </div>
+      </form>`);
+    $('#book-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const name = (f.get('name')||'').trim().replace(/\s+/g,' ');
+      const grade = (f.get('grade')||'').trim();
+      const contact = (f.get('contact')||'').trim();
+      const err = $('#form-error');
+      const show = (m) => { err.textContent = m; err.classList.remove('hidden'); };
+      if (name.split(' ').length < 2) return show('Аты-жөніңізді толық енгізіңіз: кемінде тегі мен аты.');
+      if (!grade) return show('Сыныпты көрсетіңіз.');
+      const isMail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+      const isPhone = contact.replace(/\D/g,'').length >= 10;
+      if (!isMail && !isPhone) return show('Дұрыс пошта немесе телефон нөмірін енгізіңіз (кемінде 10 цифр).');
+      if (reservations[copyId]) return show('Бұл дана бұрын брондалған. Басқасын таңдаңыз.');
+
+      const r = { bookId: book.id, name, grade, contact, date: new Date().toISOString(),
+                  code: 'Б-' + Math.floor(1000 + Math.random()*9000) };
+      reservations[copyId] = r;
+      save();
+      try { localStorage.setItem('school-library-last-student', JSON.stringify({name, grade, contact})); } catch {}
+      renderAll();
+      showConfirmation(copyId, r);
+    });
+  }
+
+  const fmtDate = (iso) => new Date(iso).toLocaleString('kk-KZ', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  function showConfirmation(copyId, r) {
+    const b = bookById(r.bookId);
+    openModal(`
+      <div class="text-center">
+        <div class="text-4xl" aria-hidden="true">✅</div>
+        <h2 class="serif text-xl font-bold mt-2">Кітап брондалды</h2>
+        <p class="text-sm text-stone-600 mt-1">Кітапты алғанда бронь кодын кітапханашыға көрсетіңіз.</p>
+      </div>
+      <dl class="mt-4 text-sm bg-stone-50 rounded-xl p-4 space-y-2">
+        ${[['Бронь коды', r.code], ['Кітап', b.title], ['Автор', b.author], ['Инвентарлық нөмір', copyId],
+           ['Аты-жөні', r.name], ['Сынып', r.grade], ['Байланыс', r.contact], ['Күні', fmtDate(r.date)]]
+          .map(([k,v]) => `<div class="flex justify-between gap-4"><dt class="text-stone-500">${k}</dt><dd class="font-medium text-right break-all">${esc(v)}</dd></div>`).join('')}
+      </dl>
+      <div class="flex gap-2 mt-4">
+        <button data-close class="flex-1 py-2.5 rounded-lg text-white font-medium" style="background:var(--green)">Дайын</button>
+        <button data-goto-my class="px-4 py-2.5 rounded-lg border border-stone-300">Менің брондарым</button>
+      </div>`);
+  }
+
+  /* ---------- Мои брони ---------- */
+  function renderMy() {
+    const name = norm($('#my-name').value);
+    const box = $('#my-list');
+    if (!name) { box.innerHTML = `<p class="text-stone-500">Аты-жөніңізді енгізіп, брондарыңызды көріңіз.</p>`; return; }
+    const mine = Object.entries(reservations).filter(([, r]) => norm(r.name) === name);
+    if (!mine.length) {
+      box.innerHTML = `<p class="text-stone-600 bg-white border border-stone-200 rounded-xl p-4">Бұл аты-жөні бойынша бронь жоқ. Жазылуын тексеріңіз немесе каталогтан кітап брондаңыз.</p>`;
+      return;
+    }
+    box.innerHTML = mine.map(([copyId, r]) => {
+      const b = bookById(r.bookId);
+      return `<div class="bg-white border border-stone-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="serif font-bold">${esc(b.title)}</h3>
+          <p class="text-sm text-stone-600">${esc(b.author)}</p>
+          <p class="text-sm mt-1">Инв. нөмірі: <span class="font-mono font-bold">${esc(copyId)}</span> · Коды: <b>${esc(r.code)}</b></p>
+          <p class="text-xs text-stone-500 mt-1">Брондалған күні: ${fmtDate(r.date)}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-rose-100 text-rose-800">Брондалған</span>
+          <button data-cancel="${esc(copyId)}" class="text-sm px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50">Бронды болдырмау</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function confirmCancel(copyId) {
+    const r = reservations[copyId];
+    if (!r) return;
+    const b = bookById(r.bookId);
+    openModal(`
+      <h2 class="serif text-xl font-bold">Бронды болдырмайсыз ба?</h2>
+      <p class="text-sm text-stone-600 mt-2">«${esc(b.title)}», <span class="font-mono font-bold">${esc(copyId)}</span> данасы қайтадан басқа оқушыларға қолжетімді болады.</p>
+      <div class="flex gap-2 mt-5">
+        <button data-do-cancel="${esc(copyId)}" class="flex-1 py-2.5 rounded-lg bg-rose-700 text-white font-medium">Иә, болдырмау</button>
+        <button data-close class="px-4 py-2.5 rounded-lg border border-stone-300">Қалдыру</button>
+      </div>`);
+  }
+
+  /* ---------- Навигация и события ---------- */
+  function showTab(tab) {
+    const my = tab === 'my';
+    $('#view-catalog').classList.toggle('hidden', my);
+    $('#view-my').classList.toggle('hidden', !my);
+    document.querySelectorAll('.tab').forEach(t => {
+      const active = t.id === 'tab-' + tab;
+      t.classList.toggle('bg-white', active);
+      t.classList.toggle('text-emerald-950', active);
+      t.classList.toggle('text-white', !active);
+      t.classList.toggle('hover:bg-white/10', !active);
+      t.setAttribute('aria-current', active ? 'page' : 'false');
+    });
+    if (my) renderMy();
+  }
+
+  function updateMyBadge() {
+    const name = norm($('#my-name').value);
+    const n = name ? Object.values(reservations).filter(r => norm(r.name) === name).length : 0;
+    const badge = $('#my-count');
+    badge.textContent = n;
+    badge.classList.toggle('hidden', n === 0);
+  }
+
+  function renderAll() {
+    renderGenres(); renderCatalog(); renderMy(); updateMyBadge();
+  }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) { if (e.target.id === 'overlay') closeModal(); return; }
+    if (t.dataset.genre) { genre = t.dataset.genre; renderGenres(); renderCatalog(); }
+    else if (t.dataset.book) openBookingForm(t.dataset.book);
+    else if (t.dataset.cancel) confirmCancel(t.dataset.cancel);
+    else if (t.dataset.doCancel) { delete reservations[t.dataset.doCancel]; save(); closeModal(); renderAll(); }
+    else if (t.dataset.close !== undefined) closeModal();
+    else if (t.dataset.gotoMy !== undefined) {
+      const last = (() => { try { return JSON.parse(localStorage.getItem('school-library-last-student')) || {}; } catch { return {}; } })();
+      if (last.name) $('#my-name').value = last.name;
+      closeModal(); renderAll(); showTab('my');
+    }
+    else if (t.id === 'tab-catalog') showTab('catalog');
+    else if (t.id === 'tab-my') showTab('my');
+    else if (t.id === 'my-find') { renderMy(); updateMyBadge(); }
+  });
+  $('#overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+  $('#search').addEventListener('input', renderCatalog);
+  $('#only-free').addEventListener('change', renderCatalog);
+  $('#my-name').addEventListener('input', () => { renderMy(); updateMyBadge(); });
+  $('#my-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') renderMy(); });
+  // Синхронизация между вкладками браузера
+  window.addEventListener('storage', (e) => { if (e.key === KEY) { reservations = load(); renderAll(); } });
+
+  renderAll();
+  showTab('catalog');
+})();
+</script>
+</body>
+</html>
